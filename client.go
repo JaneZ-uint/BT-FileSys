@@ -2,6 +2,7 @@ package main
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -9,7 +10,6 @@ type clientNode struct {
 	node     dhtNode
 	ip       string
 	username string
-	password string
 }
 
 func init() {
@@ -17,18 +17,24 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 	localAddress = "127.0.0.1"
 	counter = 0
+	userNum = 0
 }
 
-func (client *clientNode) create(username string, password string) bool {
+func (client *clientNode) login(username string) {
 	client.node = NewNode(counter)
 	client.ip = portToAddr(localAddress, counter)
 	counter++
 	client.username = username
-	client.password = password
-	return true
+	wg := new(sync.WaitGroup)
+	client.node.Run(wg)
+	if userNum == 0 {
+		client.node.Create()
+	} else {
+		client.node.Join(client.ip)
+	}
+	userNum++
 }
 
-func (client *clientNode) login(username string, password string) bool {
+func (client *clientNode) logout(username string) {
 
-	return true
 }

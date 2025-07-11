@@ -1,233 +1,121 @@
+// Reference: https://github.com/veggiedefender/torrent-client/blob/master/torrentfile/torrentfile.go
+
 package torrent
 
 import (
 	"bytes"
 	"crypto/sha1"
-	"encoding/hex"
-	"errors"
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
-	"sync"
 
 	"github.com/jackpal/bencode-go"
 )
 
-// 默认参数
-type Config struct {
-	PieceLength int //256KB
-	AnnounceURL string
-}
+const PieceSize = 256 << 10
 
-func DefaultConfig() Config {
-	return Config{
-		PieceLength: 256 << 10, // 256KB
-		AnnounceURL: "",
-	}
-}
-
-// .torrent 文件信息
-type MetaInfo struct {
-	Announce string   `bencode:"announce"`
-	Info     InfoDict `bencode:"info"`
-}
-
-type InfoDict struct {
-	PieceLength int    `bencode:"piece length"`
-	Pieces      string `bencode:"pieces"`
-	Length      int    `bencode:"length,omitempty"`
-	Name        string `bencode:"name"`
-	Files       []File `bencode:"files,omitempty"`
-}
-
-type File struct {
-	Length int      `bencode:"length"`
-	Path   []string `bencode:"path"`
-}
-
-// 一种人类能读懂的torrent文件
-type Torrent struct {
+// TorrentFile encodes the metadata from a .torrent file
+type TorrentFile struct {
+	Announce    string
 	InfoHash    [20]byte
 	PieceHashes [][20]byte
 	PieceLength int
-	TotalSize   int64
+	Length      int
 	Name        string
-	IsMultiFile bool
-	Files       []File
 }
 
-func ParseFile(path string) (*Torrent, error) {
+type bencodeInfo struct {
+	Pieces      string `bencode:"pieces"`
+	PieceLength int    `bencode:"piece length"`
+	Length      int    `bencode:"length"`
+	Name        string `bencode:"name"`
+}
+
+type bencodeTorrent struct {
+	Announce string      `bencode:"announce"`
+	Info     bencodeInfo `bencode:"info"`
+}
+
+func Open(path string) (TorrentFile, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return TorrentFile{}, err
 	}
 	defer file.Close()
 
-	return ReadFile(file)
+	bto := bencodeTorrent{}
+	err = bencode.Unmarshal(file, &bto)
+	if err != nil {
+		return TorrentFile{}, err
+	}
+	return bto.toTorrentFile()
 }
 
-// 解析Bencode编码文件
-func ReadFile(r io.Reader) (*Torrent, error) {
-	var meta MetaInfo
-	err := bencode.Unmarshal(r, &meta)
-	if err != nil {
+func (i *bencodeInfo) splitPieceHashes() ([][20]byte, error) {
+	hashLen := 20 // Length of SHA-1 hash
+	buf := []byte(i.Pieces)
+	if len(buf)%hashLen != 0 {
+		err := fmt.Errorf("Received malformed pieces of length %d", len(buf))
 		return nil, err
 	}
-	return processMetaInfo(&meta)
-}
+	numHashes := len(buf) / hashLen
+	hashes := make([][20]byte, numHashes)
 
-func Create(inputPath, outputPath string, config Config) error {
-	info, err := buildInfoDict(inputPath, config.PieceLength)
-	if err != nil {
-		return err
-	}
-	meta := MetaInfo{
-		Announce: config.AnnounceURL,
-		Info:     *info,
-	}
-
-	if outputPath == "" {
-		outputPath = inputPath + ".torrent"
-	}
-
-	file, err := os.Create(outputPath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	return bencode.Marshal(file, meta)
-}
-
-func processMetaInfo(meta *MetaInfo) (*Torrent, error) {
-	infoHash, err := hashInfoDict(&meta.Info)
-	if err != nil {
-		return nil, err
-	}
-	pieceHashes, err := splitPieceHashes(meta.Info.Pieces)
-	if err != nil {
-		return nil, err
-	}
-	var totalSize int64
-	if meta.Info.Length > 0 {
-		totalSize = int64(meta.Info.Length)
-	} else {
-		for _, f := range meta.Info.Files {
-			totalSize += int64(f.Length)
-		}
-	}
-
-	return &Torrent{
-		InfoHash:    infoHash,
-		PieceHashes: pieceHashes,
-		PieceLength: meta.Info.PieceLength,
-		TotalSize:   totalSize,
-		Name:        meta.Info.Name,
-		IsMultiFile: meta.Info.Length == 0,
-		Files:       meta.Info.Files,
-	}, nil
-}
-
-func hashInfoDict(info *InfoDict) ([20]byte, error) {
-	var buf bytes.Buffer
-	err := bencode.Marshal(&buf, info)
-	if err != nil {
-		return [20]byte{}, err
-	}
-	return sha1.Sum(buf.Bytes()), nil
-}
-
-func splitPieceHashes(pieces string) ([][20]byte, error) {
-	const hashSize = 20
-	buf := []byte(pieces)
-	if len(buf)%hashSize != 0 {
-		return nil, errors.New("")
-	}
-	count := len(buf) / hashSize
-	hashes := make([][20]byte, count)
-	for i := 0; i < count; i++ {
-		copy(hashes[i][:], buf[i*hashSize:(i+1)*hashSize])
+	for i := 0; i < numHashes; i++ {
+		copy(hashes[i][:], buf[i*hashLen:(i+1)*hashLen])
 	}
 	return hashes, nil
 }
 
-func buildInfoDict(path string, pieceLength int) (*InfoDict, error) {
-	info := &InfoDict{
-		PieceLength: pieceLength,
-		Name:        filepath.Base(path),
-	}
-	fileInfo, err := os.Stat(path)
+func (bto *bencodeTorrent) toTorrentFile() (TorrentFile, error) {
+	infoHash, err := bto.Info.hash()
 	if err != nil {
-		return nil, err
+		return TorrentFile{}, err
 	}
-	if fileInfo.IsDir() {
-		return nil, errors.New("")
-	}
-	info.Length = int(fileInfo.Size())
-	pieces, err := hashPieces(path, pieceLength)
+	pieceHashes, err := bto.Info.splitPieceHashes()
 	if err != nil {
-		return nil, err
+		return TorrentFile{}, err
 	}
-	info.Pieces = pieces
-	return info, nil
+	t := TorrentFile{
+		Announce:    bto.Announce,
+		InfoHash:    infoHash,
+		PieceHashes: pieceHashes,
+		PieceLength: bto.Info.PieceLength,
+		Length:      bto.Info.Length,
+		Name:        bto.Info.Name,
+	}
+	return t, nil
 }
 
-func hashPieces(path string, pieceLength int) (string, error) {
-	var pieces = make([]byte, pieceLength)
+func (i *bencodeInfo) hash() ([20]byte, error) {
 	var buf bytes.Buffer
-	file, err := os.Open(path)
+	err := bencode.Marshal(&buf, *i)
 	if err != nil {
-		return "", err
+		return [20]byte{}, err
 	}
-	defer file.Close()
-	var Lock sync.RWMutex
-	var wg sync.WaitGroup
-	var errChan = make(chan error, 1)
-	for {
-		n, err := io.ReadFull(file, pieces)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return "", err
-		}
-		wg.Add(1)
-		go func(data []byte) {
-			defer wg.Done()
-			h := sha1.Sum(data)
-			Lock.Lock()
-			defer Lock.Unlock()
-			_, err := buf.Write(h[:])
-			if err != nil {
-				select {
-				case errChan <- err:
-				default:
-				}
-			}
-		}(pieces[:n])
-	}
-	wg.Wait()
-	select {
-	case err := <-errChan:
-		return "", err
-	default:
-	}
-	return buf.String(), nil
+	h := sha1.Sum(buf.Bytes())
+	return h, nil
 }
 
-func (t *Torrent) Print() string {
-	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "Name: %s\n", t.Name)
-	fmt.Fprintf(&buf, "InfoHash: %s\n", hex.EncodeToString(t.InfoHash[:]))
-	fmt.Fprintf(&buf, "Piece Length: %d bytes\n", t.PieceLength)
-	fmt.Fprintf(&buf, "Total Size: %d bytes\n", t.TotalSize)
-	fmt.Fprintf(&buf, "Pieces: %d\n", len(t.PieceHashes))
-	if t.IsMultiFile {
-		fmt.Fprintln(&buf, "\nFiles:")
-		for _, f := range t.Files {
-			fmt.Fprintf(&buf, "  %s - %d bytes\n", filepath.Join(f.Path...), f.Length)
-		}
+func ToDotTorrentFile(inputPath, outputPath string) error {
+	file, err := os.Stat(inputPath)
+	if err != nil {
+		return err
 	}
-	return buf.String()
+	tmp := bencodeTorrent{}
+	tmp.Announce = "Tracker"
+	tmp.Info = bencodeInfo{"", PieceSize, int(file.Size()), file.Name()}
+	if outputPath == "" {
+		outputPath = inputPath + ".torrent"
+	} else {
+		outputPath = outputPath + "/" + file.Name() + ".torrent"
+	}
+	newfile, err1 := os.Create(outputPath)
+	if err1 != nil {
+		return err1
+	}
+	err2 := bencode.Marshal(newfile, tmp)
+	if err2 != nil {
+		return err2
+	}
+	return nil
 }
