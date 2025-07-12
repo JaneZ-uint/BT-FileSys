@@ -14,6 +14,8 @@ type UploadInfo struct {
 }
 
 type DownloadInfo struct {
+	data  []byte
+	index int
 }
 
 func upload(inputPath, outputPath string, node *dhtNode) error {
@@ -44,7 +46,7 @@ func upload(inputPath, outputPath string, node *dhtNode) error {
 			if end > fileLength {
 				end = fileLength
 			}
-			putPieces(node, blockNum, i, file[start:end], ch)
+			putPieces(node, i, file[start:end], ch)
 		}(i)
 	}
 	wg.Wait()
@@ -69,10 +71,11 @@ func upload(inputPath, outputPath string, node *dhtNode) error {
 		return err
 	}
 	(*node).Put(fmt.Sprintf("%x", key), content)
+	fmt.Println("Upload completed, torrent file saved to:", content)
 	return nil
 }
 
-func putPieces(node *dhtNode, blocknum int, index int, data []byte, ch chan UploadInfo) {
+func putPieces(node *dhtNode, index int, data []byte, ch chan UploadInfo) {
 	info := pieceInfo{data, index}
 	HashResult, err := info.pieceHash()
 	if err != nil {
@@ -85,6 +88,55 @@ func putPieces(node *dhtNode, blocknum int, index int, data []byte, ch chan Uplo
 	ch <- UploadInfo{HashResult, index}
 }
 
-func download(inputPath, outputPath string, node *dhtNode) {
+func download(inputPath, outputPath string, node *dhtNode) error {
+	fileInfo, err := Open(inputPath)
+	if err != nil {
+		return err
+	}
+	var downloadFile []byte
+	downloadFile = make([]byte, fileInfo.Length)
+	var blocknum int
+	blocknum = len(fileInfo.PieceHashes)
+	var wg sync.WaitGroup
+	var ch chan DownloadInfo
+	ch = make(chan DownloadInfo, blocknum+5)
+	for i := 0; i < blocknum; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			getPieces(node, i, fileInfo.PieceHashes[i], ch)
+		}(i)
+	}
+	wg.Wait()
+	var flag bool
+	flag = true
+	for flag {
+		select {
+		case result := <-ch:
+			index := result.index
+			copy(downloadFile[index*PieceSize:index*PieceSize+len(result.data)], result.data)
+		default:
+			flag = false
+			var downloadfileName string
+			if outputPath == "" {
+				downloadfileName = fileInfo.Name
+			} else {
+				downloadfileName = fileInfo.Name + "/" + outputPath
+			}
+			err = os.WriteFile(downloadfileName, downloadFile, 0644)
+			if err != nil {
+				return err
+			}
+			fmt.Println("Download completed, file saved to:", downloadfileName)
+		}
+	}
+	return nil
+}
 
+func getPieces(node *dhtNode, index int, hash [20]byte, ch chan DownloadInfo) {
+	ok, data := (*node).Get(fmt.Sprintf("%x", hash))
+	if !ok {
+		return
+	}
+	ch <- DownloadInfo{data: []byte(data), index: index}
 }
