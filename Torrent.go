@@ -1,6 +1,6 @@
 // Reference: https://github.com/veggiedefender/torrent-client/blob/master/torrentfile/torrentfile.go
 
-package torrent
+package main
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"github.com/jackpal/bencode-go"
 )
 
-const PieceSize = 256 << 10
+const PieceSizes = 256 << 10
 
 // TorrentFile encodes the metadata from a .torrent file
 type TorrentFile struct {
@@ -33,6 +33,11 @@ type bencodeInfo struct {
 type bencodeTorrent struct {
 	Announce string      `bencode:"announce"`
 	Info     bencodeInfo `bencode:"info"`
+}
+
+type pieceInfo struct {
+	Data  []byte
+	index int
 }
 
 func Open(path string) (TorrentFile, error) {
@@ -96,14 +101,25 @@ func (i *bencodeInfo) hash() ([20]byte, error) {
 	return h, nil
 }
 
-func ToDotTorrentFile(inputPath, outputPath string) error {
+func (tmp *pieceInfo) pieceHash() ([20]byte, error) {
+	var buf bytes.Buffer
+	err := bencode.Marshal(&buf, *tmp)
+	if err != nil {
+		return [20]byte{}, err
+	}
+	h := sha1.Sum(buf.Bytes())
+	return h, nil
+}
+
+func ToDotTorrentFile(inputPath, outputPath string, pieces chan string, info chan bencodeInfo, ch chan string) error {
 	file, err := os.Stat(inputPath)
 	if err != nil {
 		return err
 	}
 	tmp := bencodeTorrent{}
 	tmp.Announce = "Tracker"
-	tmp.Info = bencodeInfo{"", PieceSize, int(file.Size()), file.Name()}
+	tmp.Info = bencodeInfo{"", PieceSizes, int(file.Size()), file.Name()}
+	tmp.Info.Pieces = <-pieces
 	if outputPath == "" {
 		outputPath = inputPath + ".torrent"
 	} else {
@@ -117,5 +133,11 @@ func ToDotTorrentFile(inputPath, outputPath string) error {
 	if err2 != nil {
 		return err2
 	}
+	content, err3 := os.ReadFile(outputPath)
+	if err3 != nil {
+		return err3
+	}
+	info <- tmp.Info
+	ch <- string(content)
 	return nil
 }

@@ -38,3 +38,15 @@ func (client *clientNode) login(username string) {
 func (client *clientNode) logout(username string) {
 
 }
+
+func (client *clientNode) checkout() bool {
+
+}
+
+func (client *clientNode) upload() {
+
+}
+
+func (client *clientNode) download() {
+
+}

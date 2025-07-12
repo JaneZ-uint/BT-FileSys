@@ -1,7 +1,7 @@
 package core
 
 import (
-	network "BT/network"
+	network "BT/Network"
 	"crypto/sha1"
 	"errors"
 	"math/big"
