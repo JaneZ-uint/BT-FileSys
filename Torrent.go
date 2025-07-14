@@ -59,7 +59,7 @@ func (i *bencodeInfo) splitPieceHashes() ([][20]byte, error) {
 	hashLen := 20 // Length of SHA-1 hash
 	buf := []byte(i.Pieces)
 	if len(buf)%hashLen != 0 {
-		err := fmt.Errorf("Received malformed pieces of length %d", len(buf))
+		err := fmt.Errorf("invalid pieces length: %d, must be a multiple of %d", len(buf), hashLen)
 		return nil, err
 	}
 	numHashes := len(buf) / hashLen

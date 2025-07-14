@@ -10,7 +10,9 @@ var counter int
 
 var userNum int
 
-var boss *clientNode
+var boss dhtNode
+
+const total = 100
 
 func main() {
 	var op string
@@ -18,19 +20,14 @@ func main() {
 	var filename string
 	for {
 		fmt.Scanln(&op)
-		// 用户注册
-		if op == "register" {
+		if op == "login" { // 用户登录
 			fmt.Scanln(&username)
-			Register()
-			fmt.Printf("User %s successfully [register]", username)
-		} else if op == "login" { // 用户登录
-			fmt.Scanln(&username)
-			boss.Login(username)
+			Login(username, &boss)
 			fmt.Printf("User %s successfully [login]", username)
 		} else if op == "upload" { //用户上传文件
 			fmt.Scanln(&username, &filename)
 			var err error
-			err = boss.upload(UploadStruct{InputPath: filename, OutputPath: filename}, boss.ip)
+			err = Upload(UploadStruct{InputPath: filename, OutputPath: filename}, &boss)
 			if err != nil {
 				fmt.Printf("User %s successfully [upload] %s", username, filename)
 			} else {
@@ -39,22 +36,15 @@ func main() {
 		} else if op == "download" { //用户下载文件
 			fmt.Scanln(&username, &filename)
 			var err error
-			err = boss.download(DownloadStruct{InputPath: filename, OutputPath: filename}, boss.ip)
+			err = Download(DownloadStruct{InputPath: filename, OutputPath: filename}, &boss)
 			if err != nil {
 				fmt.Printf("User %s successfully download %s", username, filename)
 			} else {
 				fmt.Printf("Failed to download.Please retry later.")
 			}
 		} else if op == "exit" {
-			for i := 0; i < counter; i++ {
-				var addr = portToAddr(localAddress, i)
-				if addr == boss.ip {
-					continue
-				}
-				boss.RemoteCall(addr, "ClientNode.QuitAll", "", nil)
-			}
-			boss.QuitAll("", nil)
-			fmt.Println("Bye. Bet it has been a wonderful experience.")
+			boss.ForceQuit()
+			fmt.Println("Bye. Bet it has been a terrible experience.")
 			break
 		}
 	}

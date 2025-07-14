@@ -1,17 +1,10 @@
 package main
 
 import (
-	network "BT/Network"
 	"math/rand"
 	"sync"
 	"time"
 )
-
-type clientNode struct {
-	node dhtNode
-	ip   string
-	network.NetworkStation
-}
 
 type UploadStruct struct {
 	InputPath  string
@@ -28,70 +21,44 @@ func init() {
 	localAddress = "127.0.0.1"
 	counter = 0
 	userNum = 0
-	boss = new(clientNode)
-	boss.ip = portToAddr(localAddress, counter)
-	boss.node = NewNode(counter)
-	counter++
 	wg := new(sync.WaitGroup)
-	boss.node.Run(wg)
-	boss.InitRPC(boss, "ClientNode")
-	go boss.RunRPCServer(boss.ip, wg)
+	for i := 0; i < total; i++ {
+		wg.Add(1)
+		if i == 0 {
+			boss = NewNode(counter)
+			counter++
+			go boss.Run(wg)
+		} else {
+			var client dhtNode
+			client = NewNode(counter)
+			counter++
+			go client.Run(wg)
+		}
+	}
+	wg.Wait()
 }
 
-func Register() {
-	var client clientNode
-	client.ip = portToAddr(localAddress, counter)
-	client.node = NewNode(counter)
-	counter++
-	wg := new(sync.WaitGroup)
-	client.node.Run(wg)
-	client.InitRPC(&client, "ClientNode")
-	go client.RunRPCServer(client.ip, wg)
-}
-
-func (client *clientNode) Login(username string) {
+func Login(username string, client *dhtNode) {
 	if userNum == 0 {
-		client.node.Create()
+		(*client).Create()
 	} else {
-		client.node.Join(username)
+		(*client).Join(username)
 	}
 	userNum++
 }
 
-func (client *clientNode) upload(filename UploadStruct, Addr string) error {
-	err := client.RemoteCall(Addr, "ClientNode.Upload", filename, &struct{}{})
+func Upload(filename UploadStruct, client *dhtNode) error {
+	err := upload(filename.InputPath, filename.OutputPath, client)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (client *clientNode) Upload(filename UploadStruct, reply *struct{}) error {
-	err := upload(filename.InputPath, filename.OutputPath, &client.node)
+func Download(filename DownloadStruct, client *dhtNode) error {
+	err := download(filename.InputPath, filename.OutputPath, client)
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (client *clientNode) download(filename DownloadStruct, Addr string) error {
-	err := client.RemoteCall(Addr, "ClientNode.Download", filename, &struct{}{})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (client *clientNode) Download(filename DownloadStruct, reply *struct{}) error {
-	err := download(filename.InputPath, filename.OutputPath, &client.node)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (client *clientNode) QuitAll(_ string, reply *struct{}) error {
-	client.node.ForceQuit()
-	client.StopRPCServer()
 	return nil
 }

@@ -31,12 +31,16 @@ func upload(inputPath, outputPath string, node *dhtNode) error {
 		blockNum = fileLength/PieceSize + 1
 	}
 
-	var hash []byte = make([]byte, 20*blockNum)
+	var hash []byte = make([]byte, 20*blockNum+5)
 	var pieces chan string
+	pieces = make(chan string, 1)
 	var info chan bencodeInfo
+	info = make(chan bencodeInfo, 1)
 	var channel chan string
+	channel = make(chan string)
 	var ch chan UploadInfo
-	var wg sync.WaitGroup
+	ch = make(chan UploadInfo, blockNum+5)
+	wg := new(sync.WaitGroup)
 	for i := 0; i < blockNum; i++ {
 		wg.Add(1)
 		go func(i int) {
@@ -97,7 +101,7 @@ func download(inputPath, outputPath string, node *dhtNode) error {
 	downloadFile = make([]byte, fileInfo.Length)
 	var blocknum int
 	blocknum = len(fileInfo.PieceHashes)
-	var wg sync.WaitGroup
+	wg := new(sync.WaitGroup)
 	var ch chan DownloadInfo
 	ch = make(chan DownloadInfo, blocknum+5)
 	for i := 0; i < blocknum; i++ {
