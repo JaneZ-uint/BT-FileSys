@@ -22,7 +22,12 @@ func init() {
 	counter = 0
 	userNum = 0
 	wg := new(sync.WaitGroup)
-	for i := 0; i < total; i++ {
+	boss = NewNode(counter)
+	counter++
+	wg.Add(1)
+	go boss.Run(wg)
+	wg.Wait()
+	/*for i := 0; i < total; i++ {
 		wg.Add(1)
 		if i == 0 {
 			boss = NewNode(counter)
@@ -35,7 +40,7 @@ func init() {
 			go client.Run(wg)
 		}
 	}
-	wg.Wait()
+	wg.Wait()*/
 }
 
 func Login(username string, client *dhtNode) {
