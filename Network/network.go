@@ -57,19 +57,19 @@ func (node *NetworkStation) StopRPCServer() {
 // 是否建立 connection pool 待定
 func (node *NetworkStation) RemoteCall(addr string, method string, args interface{}, reply interface{}) error {
 	if method != "ChordNode.Ping" {
-		//logrus.Infof("[%s] RemoteCall %s %s %v", node.addr, addr, method, args)
+		logrus.Infof("[%s] RemoteCall %s %s %v", node.addr, addr, method, args)
 	}
 	// Note: Here we use DialTimeout to set a timeout of 10 seconds.
 	conn, err := net.DialTimeout("tcp", addr, 1*time.Second)
 	if err != nil {
-		//logrus.Error("dialing: ", err)
+		logrus.Error("dialing: ", err)
 		return err
 	}
 	client := rpc.NewClient(conn)
 	defer client.Close()
 	err = client.Call(method, args, reply)
 	if err != nil {
-		//logrus.Error("RemoteCall error: ", err)
+		logrus.Error("RemoteCall error: ", err)
 		return err
 	}
 	return nil

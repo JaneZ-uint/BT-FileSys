@@ -1,7 +1,7 @@
 package main
 
 import (
-	"BT/core"
+	chord "BT/core"
 	"fmt"
 )
 
@@ -13,7 +13,7 @@ import (
 
 func NewNode(port int) dhtNode {
 	// Todo: create a node and then return it.
-	node := new(core.KademliaNode)
+	node := new(chord.ChordNode)
 	node.Init(portToAddr(localAddress, port))
 	return node
 }

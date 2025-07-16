@@ -30,8 +30,8 @@ func upload(inputPath, outputPath string, node *dhtNode) error {
 	} else {
 		blockNum = fileLength/PieceSize + 1
 	}
-
-	var hash []byte = make([]byte, 20*blockNum+5)
+	fmt.Println("File length:", fileLength, "Block number:", blockNum)
+	var hash []byte = make([]byte, 20*blockNum+20)
 	var pieces chan string
 	pieces = make(chan string, 1)
 	var info chan bencodeInfo
@@ -43,33 +43,43 @@ func upload(inputPath, outputPath string, node *dhtNode) error {
 	wg := new(sync.WaitGroup)
 	for i := 0; i < blockNum; i++ {
 		wg.Add(1)
-		go func(i int) {
+		go func(j int) {
 			defer wg.Done()
-			start := i * PieceSize
+			start := j * PieceSize
 			end := start + PieceSize
 			if end > fileLength {
 				end = fileLength
 			}
-			putPieces(node, i, file[start:end], ch)
+			putPieces(node, j, file[start:end], ch)
 		}(i)
 	}
 	wg.Wait()
+	//fmt.Println("All pieces uploaded, preparing torrent file...")
 	go ToDotTorrentFile(inputPath, outputPath, pieces, info, channel)
+	//fmt.Println("Torrent file creation in progress...")
 	var flag bool
 	flag = true
+	count := 0
 	for flag {
 		select {
 		case result := <-ch:
+			count++
 			index := result.index
+			fmt.Print(index)
 			copy(hash[index*20:index*20+20], result.hashes[:])
 		default:
 			flag = false
 		}
 	}
+	fmt.Println("All pieces processed, preparing to save torrent file...")
 	//传回去哈希后各个块的索引
+	fmt.Print(count)
+	fmt.Println(len(hash), "pieces to be saved in torrent file")
 	pieces <- string(hash)
 	content := <-channel
+	//fmt.Println("Torrent file content:", content)
 	ViewInfo := <-info
+	//fmt.Println("Torrent file content:", content)
 	key, err := ViewInfo.hash()
 	if err != nil {
 		return err
@@ -87,8 +97,10 @@ func putPieces(node *dhtNode, index int, data []byte, ch chan UploadInfo) {
 	}
 	ok := (*node).Put(fmt.Sprintf("%x", HashResult), string(data))
 	if !ok {
+		fmt.Print("Failed to upload piece", index, "to DHT node.")
 		return
 	}
+	fmt.Println("Piece", index, "uploaded successfully")
 	ch <- UploadInfo{HashResult, index}
 }
 
@@ -106,9 +118,9 @@ func download(inputPath, outputPath string, node *dhtNode) error {
 	ch = make(chan DownloadInfo, blocknum+5)
 	for i := 0; i < blocknum; i++ {
 		wg.Add(1)
-		go func(i int) {
+		go func(j int) {
 			defer wg.Done()
-			getPieces(node, i, fileInfo.PieceHashes[i], ch)
+			getPieces(node, j, fileInfo.PieceHashes[j], ch)
 		}(i)
 	}
 	wg.Wait()
@@ -125,7 +137,7 @@ func download(inputPath, outputPath string, node *dhtNode) error {
 			if outputPath == "" {
 				downloadfileName = fileInfo.Name
 			} else {
-				downloadfileName = fileInfo.Name + "/" + outputPath
+				downloadfileName = outputPath + "/" + fileInfo.Name
 			}
 			err = os.WriteFile(downloadfileName, downloadFile, 0644)
 			if err != nil {

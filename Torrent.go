@@ -121,15 +121,19 @@ func ToDotTorrentFile(inputPath, outputPath string, pieces chan string, info cha
 	tmp.Info = bencodeInfo{"", PieceSizes, int(file.Size()), file.Name()}
 	tmp.Info.Pieces = <-pieces
 	if outputPath == "" {
-		outputPath = inputPath + ".torrent"
+		outputPath = file.Name() + ".torrent"
 	} else {
 		outputPath = outputPath + "/" + file.Name() + ".torrent"
 	}
 	newfile, err1 := os.Create(outputPath)
+	fmt.Println("Torrent file created:", outputPath)
 	if err1 != nil {
+		fmt.Println("Error creating torrent file:", err1)
 		return err1
 	}
+	//fmt.Println("Torrent file created:", outputPath)
 	err2 := bencode.Marshal(newfile, tmp)
+	//fmt.Println("Torrent file created:", outputPath)
 	if err2 != nil {
 		return err2
 	}

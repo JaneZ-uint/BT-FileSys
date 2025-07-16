@@ -22,7 +22,7 @@ func init() {
 	counter = 0
 	userNum = 0
 	wg := new(sync.WaitGroup)
-	boss = NewNode(counter)
+	boss = NewNode(20000 + counter)
 	counter++
 	wg.Add(1)
 	go boss.Run(wg)
