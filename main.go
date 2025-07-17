@@ -19,19 +19,19 @@ func main() {
 	var username string
 	var inputName string
 	var outputName string
-	op = ""
-	username = ""
-	inputName = ""
-	outputName = ""
+	fmt.Print("Welcome to JaneZ's DHT File Sharing System!\n")
+	fmt.Print("Please input your operation:\n")
 	for {
+		op = ""
+		username = ""
+		inputName = ""
+		outputName = ""
 		fmt.Scanln(&op, &username, &inputName, &outputName)
+		fmt.Print("\n")
 		if op == "login" { // 用户登录
-			//fmt.Scanln(&username)
-			//fmt.Print(username)
 			Login(username, &boss)
 			fmt.Printf("User %s successfully [login]", username)
 		} else if op == "upload" { //用户上传文件
-			//fmt.Scanln(&username, &filename)
 			var err error
 			err = Upload(UploadStruct{InputPath: inputName, OutputPath: outputName}, &boss)
 			if err == nil {
@@ -41,7 +41,6 @@ func main() {
 				fmt.Printf("Failed to upload.Please retry later.")
 			}
 		} else if op == "download" { //用户下载文件
-			//fmt.Scanln(&username, &filename)
 			var err error
 			err = Download(DownloadStruct{InputPath: inputName, OutputPath: outputName}, &boss)
 			if err == nil {
@@ -55,5 +54,6 @@ func main() {
 			fmt.Println("Bye. Bet it has been a terrible experience.")
 			break
 		}
+		fmt.Print("\n")
 	}
 }
