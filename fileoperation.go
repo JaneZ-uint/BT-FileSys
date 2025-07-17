@@ -105,6 +105,7 @@ func putPieces(node *dhtNode, index int, data []byte, ch chan UploadInfo) {
 }
 
 func download(inputPath, outputPath string, node *dhtNode) error {
+	fmt.Print("Downloading file from DHT node...\n")
 	fileInfo, err := Open(inputPath)
 	if err != nil {
 		return err
@@ -124,6 +125,7 @@ func download(inputPath, outputPath string, node *dhtNode) error {
 		}(i)
 	}
 	wg.Wait()
+	//fmt.Println("All pieces downloaded, preparing to save file...")
 	var flag bool
 	flag = true
 	for flag {
@@ -152,7 +154,9 @@ func download(inputPath, outputPath string, node *dhtNode) error {
 func getPieces(node *dhtNode, index int, hash [20]byte, ch chan DownloadInfo) {
 	ok, data := (*node).Get(fmt.Sprintf("%x", hash))
 	if !ok {
+		//fmt.Println("Failed to download piece", index, "from DHT node.")
 		return
 	}
+	//fmt.Println(data)
 	ch <- DownloadInfo{data: []byte(data), index: index}
 }

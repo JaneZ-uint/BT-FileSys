@@ -544,7 +544,7 @@ func (node *ChordNode) Run(waitgroup *sync.WaitGroup) {
 // 创建chord 中第一个结点 Create
 // Create a new network.
 func (node *ChordNode) Create() {
-	//logrus.Infoln("[Create] Node", node.Addr)
+	logrus.Infoln("[Create] Node", node.Addr)
 	node.preLock.Lock()
 	node.predecessor = node.Addr
 	node.preLock.Unlock()
@@ -553,7 +553,7 @@ func (node *ChordNode) Create() {
 
 // 加入一个新的结点 Join 接口
 func (node *ChordNode) Join(addr string) bool {
-	//logrus.Infof("[Join] Node %s join chord", node.Addr)
+	logrus.Infof("[Join] Node %s join chord", node.Addr)
 	err1 := node.RemoteCall(addr, "chord.Ping", "", nil)
 	if err1 != nil {
 		//logrus.Error("[Join] Node offline", err1)
@@ -576,7 +576,7 @@ func (node *ChordNode) Join(addr string) bool {
 // Put a key-value pair into the network (if key exists, update the value).
 // Return "true" if success, "false" otherwise.
 func (node *ChordNode) Put(key string, value string) bool {
-	logrus.Infof("[Put] Pair %s", key)
+	logrus.Infof("[Put] Pair %s to %s", key, value)
 	keyID := ConsistentHash(key)
 	var successor string
 	err := node.FindSuccessor(keyID, &successor)
@@ -597,18 +597,18 @@ func (node *ChordNode) Put(key string, value string) bool {
 // Get a key-value pair from the network.
 // Return "true" and the value if success, "false" otherwise.
 func (node *ChordNode) Get(key string) (bool, string) {
-	//logrus.Infof("[Get] Pair %s", key)
+	logrus.Infof("[Get] %s,Pair %s", node.Addr, key)
 	keyID := ConsistentHash(key)
 	var successor string
 	err := node.FindSuccessor(keyID, &successor)
 	if err != nil {
-		//logrus.Error("[Get] failed when finding successor:", err)
+		logrus.Error("[Get] failed when finding successor:", err)
 		return false, ""
 	}
 	var target BV
 	err1 := node.RemoteCall(successor, "chord.GetValue", key, &target)
 	if err1 != nil {
-		//logrus.Error("[Get] Get value failed:", err1)
+		logrus.Error("[Get] Get value failed:", err1)
 		return false, ""
 	}
 	return target.IsGet, target.Value

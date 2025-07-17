@@ -2,7 +2,6 @@ package main
 
 import (
 	"math/rand"
-	"sync"
 	"time"
 )
 
@@ -21,35 +20,30 @@ func init() {
 	localAddress = "127.0.0.1"
 	counter = 0
 	userNum = 0
-	wg := new(sync.WaitGroup)
-	boss = NewNode(20000 + counter)
 	counter++
-	wg.Add(1)
-	go boss.Run(wg)
-	wg.Wait()
-	/*for i := 0; i < total; i++ {
-		wg.Add(1)
-		if i == 0 {
-			boss = NewNode(counter)
-			counter++
-			go boss.Run(wg)
-		} else {
-			var client dhtNode
-			client = NewNode(counter)
-			counter++
-			go client.Run(wg)
-		}
-	}
-	wg.Wait()*/
 }
 
-func Login(username string, client *dhtNode) {
+func Login(username string) {
 	if userNum == 0 {
-		(*client).Create()
+		nodes[0].Create()
+		nameMap[username] = 0
+		boss = nodes[0]
+		userNum++
+		isExist[username] = true
 	} else {
-		(*client).Join(username)
+		if isExist[username] {
+			userNum = nameMap[username]
+			boss = nodes[userNum]
+			return
+		}
+		//fmt.Print(userNum, "   ")
+		isExist[username] = true
+		//fmt.Println(nodeAddresses[userNum])
+		nodes[userNum].Join(nodeAddresses[userNum])
+		nameMap[username] = userNum
+		boss = nodes[userNum]
+		userNum++
 	}
-	userNum++
 }
 
 func Upload(filename UploadStruct, client *dhtNode) error {
