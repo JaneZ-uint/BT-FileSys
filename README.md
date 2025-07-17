@@ -19,8 +19,6 @@ A naive and toy project for uploading and downloading files faster and more safe
    ./BT
    ```
 
-You can test the proj using [test.in](test.in).
-
 ## Requirements
 - Go 1.18 or later
 - Dependencies specified in `go.mod`
