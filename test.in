@@ -1,0 +1,4 @@
+login alice
+upload alice input 
+download alice input.torrent save
+exit
