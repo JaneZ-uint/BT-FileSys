@@ -1,6 +1,6 @@
 # BT-FileSys
 
-A naive and toy project for uploading and downloading files faster and more safe.Application of DHT using kademlia protocol and BitTorrent protocol. Bonus for **DHT proj, PPCA 2025, ACM Honor Class**.
+A naive and toy project for uploading and downloading files faster and more safe.Application of DHT using chord protocol and BitTorrent protocol. Bonus for **DHT proj, PPCA 2025, ACM Honor Class**.
 
 ## Installation
 
@@ -18,6 +18,8 @@ A naive and toy project for uploading and downloading files faster and more safe
    # Use the appropriate run command for your project
    ./BT
    ```
+
+You can test the proj using [test.in](test.in).
 
 ## Requirements
 - Go 1.18 or later
